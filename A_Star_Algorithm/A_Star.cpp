@@ -1,7 +1,6 @@
 #include<bits/stdc++.h>
 #include<SFML/Graphics.hpp>
 using namespace sf;
-// using namespace std;
 
 const int dimX = 1000, 
           dimY = 800,
@@ -10,33 +9,16 @@ const int dimX = 1000,
 int adjdist = 100, diadist = 141;
 
 int srcX=-1, srcY=-1, dstX=-1, dstY=-1;
-
+int animCount = 30;
 int grid[gridSizeX][gridSizeY];
 
-void draw(bool delay=0);
+void draw();
 void plot(Vector2i &pos);
 void initialise();
 bool find_path();
-bool find_path2();
+void display_grid();
 int dist(int a, int b);
 bool out_of_bounds(int x, int y);
-
-void display_grid() {
-    // displays the grid state
-    std::cout << std::endl;
-    for (int i=0; i<gridSizeX; ++i) {
-        for (int j=0; j<gridSizeY; ++j)
-            if (grid[i][j]==1)
-                std::cout << "* ";
-            else if (grid[i][j]==2)
-                std::cout << "# ";
-            else if (grid[i][j]==3)
-                std::cout << "@ ";
-            else
-                std::cout << ". ";
-        std::cout << std::endl;
-    }
-}
 
 RenderWindow win(VideoMode(dimX, dimY), "A* Pathfinder");
 int main()  {
@@ -53,14 +35,12 @@ int main()  {
                     done = 1;
             }
             else if (dstX!=-1 && event.type == Event::MouseButtonPressed)   {
-                // std::cout << drag;
                 drag = !drag;
             }
             else if (event.type == Event::MouseButtonReleased)
                 if (event.mouseButton.button==Mouse::Left)  {
                     Vector2i pos = Mouse::getPosition(win);
                     plot(pos);
-                    // printf("srcx: %d, srcy: %d, dstx: %d, dsty: %d \n", srcX, srcY, dstX, dstY);
                 }
         }
         if (drag && !done)   {
@@ -82,6 +62,25 @@ int main()  {
     return 0;
 }
 
+void display_grid() {
+    // displays the grid state
+    std::cout << std::endl;
+    for (int i=0; i<gridSizeX; ++i) {
+        for (int j=0; j<gridSizeY; ++j)
+            // if (grid[i][j]==100+animCount)
+            //     std::cout << "* ";
+            if (grid[i][j]==200+animCount)
+                std::cout << "# ";
+            else if (grid[i][j]==300+animCount)
+                std::cout << "@ ";
+            // else if (grid[i][j]==400+animCount)
+            //     std::cout << "' ";
+            else
+                std::cout << "  ";
+        std::cout << std::endl;
+    }
+}
+
 int dist(int a, int b)  {
     if (abs(a) == abs(b))
         return diadist;
@@ -90,6 +89,12 @@ int dist(int a, int b)  {
 
 bool out_of_bounds(int x, int y)    {
     return x<0 || y<0 || x>=gridSizeX || y>=gridSizeY;
+}
+
+bool blocked(int nx, int ny, int x, int y)  {
+    if (abs(nx) != abs(ny))
+        return 0;
+    return grid[x][y+ny] && grid[x+nx][y];
 }
 
 bool find_path()   {
@@ -104,29 +109,32 @@ bool find_path()   {
         for (int j=0; j<gridSizeY; ++j) {
             gcost[i][j] = INT_MAX;
             fcost[i][j] = INT_MAX;
-            hcost[i][j] = (abs(dstX-i) + abs(dstY-j)) * adjdist;
+            hcost[i][j] = hcost[i][j] = (abs(dstX-i) + abs(dstY-j)) * adjdist;    // (std::max(abs(dstX-i), abs(dstY-j)) - std::min(abs(dstX-i), abs(dstY-j))) * adjdist + std::min(abs(dstX-i), abs(dstY-j)) * diadist;    // 
             parent[i][j] = -1;
         }
     }
-    grid[dstX][dstY] = 0;   // not visited yet
+
     gcost[srcX][srcY] = 0;
     fcost[srcX][srcY] = gcost[srcX][srcY] + hcost[srcX][srcY];
     std::set<std::tuple<int, int, int, int>> mp;
     mp.insert({fcost[srcX][srcY], hcost[srcX][srcY], srcX, srcY});
 
     std::vector<std::pair<int, int>> vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}};     // for adjacent neighbors only
-    // vector<pair<int, int>> vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, -1}, {1, -1}, {1, 1}, {-1, 1}};    // for adjacent and diagonal neighbors
+    // std::vector<std::pair<int, int>> vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, -1}, {1, -1}, {1, 1}, {-1, 1}};    // for adjacent and diagonal neighbors
     
     while (!mp.empty() && !(x == dstX && y == dstY)) {
-        draw(1);
+        draw();
         auto p = *mp.begin();
         mp.erase(mp.begin());
         x = std::get<2>(p), y = std::get<3>(p);
-        grid[x][y] = 1;
+        if (!(x==srcX && y==srcY))
+            grid[x][y] = 101;
         for (auto &v : vis)    {
             int nbx = v.first+x, nby = v.second+y;
-            if (grid[nbx][nby] || out_of_bounds(nbx, nby))
+            if (grid[nbx][nby] && !(nbx==dstX && nby==dstY) || out_of_bounds(nbx, nby) || blocked(v.first, v.second, x, y))
                 continue;
+            
+            grid[nbx][nby] = 401;
             auto it = mp.find({fcost[nbx][nby], hcost[nbx][nby], nbx, nby});
             if (gcost[nbx][nby] > gcost[x][y] + dist(v.first, v.second)) {
                 gcost[nbx][nby] = gcost[x][y] + dist(v.first, v.second);
@@ -139,14 +147,15 @@ bool find_path()   {
             mp.insert({fcost[nbx][nby], hcost[nbx][nby], nbx, nby});
         }
     }
-    grid[srcX][srcY] = 3;
+    grid[srcX][srcY] = 301;
     if (!(x==dstX && y==dstY))
         return 0;
     while (!(x==srcX && y==srcY))   {
         int p = parent[x][y];
-        grid[x][y] = 3;
+        grid[x][y] = 301;
         x = p / mx;
         y = p % mx;
+        draw();
     }
     return 1;
 }
@@ -157,49 +166,64 @@ void plot(Vector2i &pos)    {
     if (srcX == -1) {
         srcY = px;
         srcX = py;
-        grid[srcX][srcY] = 3;
+        grid[srcX][srcY] = 301;
         return;
     }
     if (dstX == -1) {
         dstX = py;
         dstY = px;
-        grid[dstX][dstY] = 3;
+        grid[dstX][dstY] = 301;
         return;
     }
     if ( (py==srcX && px==srcY) || (py==dstX && px==dstY) )
         return;
-    grid[py][px] = 2;
+    grid[py][px] = 201;
 }
 
 auto lineColor = Color(100, 200, 148),
      pathColor = Color(255, 255, 255), 
-     travColor = Color(255, 108, 128),
+     travColor = Color(255, 18, 128),
+     unviColor = Color(18, 255, 18),
      wallColor = Color(128, 128, 128);
 
 RectangleShape square(Vector2f(gap, gap));
 RectangleShape lineRec(Vector2f(1, 2));
 void initialise()   {
     lineRec.setFillColor(lineColor);
+    square.setOrigin(float(gap)/2, float(gap)/2);
     memset(grid, 0, sizeof(grid));
 }
 
-void draw(bool delay) {
+void draw() {
     win.clear();
     for (int i=0; i<gridSizeX; ++i) {
         for (int j=0; j<gridSizeY; ++j) {
-            if (grid[i][j]==3 || (i==srcX && j==srcY) || (i==dstX && j==dstY)) {   // path node
+            if (!grid[i][j])
+                continue;
+            
+            if (grid[i][j] % 100 < animCount)
+                ++grid[i][j];
+            float newscale = float(grid[i][j] % 100) / animCount;
+            square.setScale(newscale, newscale);
+            
+            if (grid[i][j] > 400) {   // unvisited node (in set)
+                square.setFillColor(unviColor);
+                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
+                win.draw(square);
+            }
+            else if (grid[i][j] > 300) {   // path node
                 square.setFillColor(pathColor);
-                square.setPosition(gap*j, gap*i);
+                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
                 win.draw(square);
             }
-            else if (grid[i][j]==1)  {   // opened node
-                square.setFillColor(travColor);
-                square.setPosition(gap*j, gap*i);
-                win.draw(square);
-            }
-            else if (grid[i][j]==2)  {  // wall node
+            else if (grid[i][j] > 200)  {  // wall node
                 square.setFillColor(wallColor);
-                square.setPosition(gap*j, gap*i);
+                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
+                win.draw(square);
+            }
+            else if (grid[i][j] > 100)  {   // opened node
+                square.setFillColor(travColor);
+                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
                 win.draw(square);
             }
         }
@@ -217,7 +241,10 @@ void draw(bool delay) {
         lineRec.move(gap, 0);
         win.draw(lineRec);
     }
+    Event event;
+    while (win.pollEvent(event))
+            if (event.type == Event::Closed)
+                win.close();
     win.display();
-    if (delay)
-        sleep(milliseconds(30));
+    sleep(milliseconds(15));
 }
