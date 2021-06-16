@@ -2,15 +2,15 @@
 #include<SFML/Graphics.hpp>
 using namespace sf;
 
-const int dimX = 1000, 
-          dimY = 800,
-          gap = 25, mx = 1000,
-          gridSizeY = dimX/gap, gridSizeX = dimY/gap;
+int dimX = 1000, 
+    dimY = 800,
+    gap = 100, mx = 1000,
+    gridSizeY = dimX/gap, gridSizeX = dimY/gap;
 int adjdist = 100, diadist = 141;
 float arrowSize = 100;
 int srcX=-1, srcY=-1, dstX=-1, dstY=-1;
 int animCount = 30, frameDelay = 15;    // miliseconds
-int grid[gridSizeX][gridSizeY];
+int grid[500][500];
 std::vector<std::pair<int, short>> path;  // final path
 /* the 2nd value of the pair can have 8 values, which are the directions from where it came from
 0 - top left
@@ -22,17 +22,21 @@ std::vector<std::pair<int, short>> path;  // final path
 7 - bottom
 8 - right
 */
-void draw();
+void draw(RenderWindow &win);
 void plot(Vector2i &pos);
 void initialise();
-bool find_path();
+bool find_path(RenderWindow &win);
 void display_grid();
+bool take_input();
 int dist(int a, int b);
 bool out_of_bounds(int x, int y);
 
-RenderWindow win(VideoMode(dimX, dimY), "A* Pathfinder");
 int main()  {
+    if (take_input())   {
+        dimY = gridSizeX * gap, dimX = gridSizeY * gap;
+    }
     initialise();
+    RenderWindow win(VideoMode(dimX, dimY), "A* Pathfinder");
     bool drag=0, done=0, calc=0;
     while (win.isOpen())    {
         Event event;
@@ -57,9 +61,9 @@ int main()  {
             Vector2i pos = Mouse::getPosition(win);
             plot(pos);
         }
-        draw();
+        draw(win);
         if (done && !calc)  {
-            if (find_path())    {
+            if (find_path(win))    {
                 std::cout << "Path found!\n";
                 display_grid();
             }
@@ -81,19 +85,34 @@ auto lineColor = Color(100, 200, 148),
      dstColor = Color(0, 0, 0), 
      arrowColor = Color(18, 255, 18);
 
-RectangleShape square(Vector2f(gap, gap));
+RectangleShape square;
 RectangleShape lineRec(Vector2f(1, 2));
 CircleShape src((float)gap/3, 20);
-RectangleShape dst(Vector2f(2*(float)gap/3, 2*(float)gap/3));
+RectangleShape dst;
 ConvexShape arrow(6);
+
+bool take_input()   {
+    char c;
+    printf("Do you want the window to open with default dimensions? (y/n): ");
+    std::cin >> c;
+    if (c=='y')
+        return 0;
+    printf("Grid Dimensions: (X <space> Y): ");
+    std::cin >> gridSizeY >> gridSizeX;
+    printf("Size of Each Square (in pixels): ");
+    std::cin >> gap;
+    return 1;
+}
 
 void initialise()   {
     memset(grid, 0, sizeof(grid));
-
     lineRec.setFillColor(lineColor);
+    square.setSize(Vector2f((float)gap, (float)gap));
     square.setOrigin(float(gap)/2, float(gap)/2);
+    src.setRadius((float)gap/3);
     src.setOrigin(src.getRadius(), src.getRadius());
     src.setFillColor(srcColor);
+    dst.setSize((Vector2f(2*(float)gap/3, 2*(float)gap/3)));
     dst.setOrigin(dst.getSize().x/2, dst.getSize().y/2);
     dst.setFillColor(dstColor);
     // arrow
@@ -108,7 +127,7 @@ void initialise()   {
     arrow.setOrigin(arrowSize, 2*arrowSize);
 }
 
-void draw() {
+void draw(RenderWindow &win) {
     win.clear();
     for (int i=0; i<gridSizeX; ++i) {
         for (int j=0; j<gridSizeY; ++j) {
@@ -212,7 +231,7 @@ bool blocked(int nx, int ny, int x, int y)  {
     return grid[x][y+ny] && grid[x+nx][y];
 }
 
-bool find_path()   {
+bool find_path(RenderWindow &win)   {
     int gcost[gridSizeX][gridSizeY],
         hcost[gridSizeX][gridSizeY],
         fcost[gridSizeX][gridSizeY],
@@ -238,7 +257,7 @@ bool find_path()   {
     // std::vector<std::pair<int, int>> vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, -1}, {1, -1}, {1, 1}, {-1, 1}};    // for adjacent and diagonal neighbors
     
     while (!mp.empty() && !(x == dstX && y == dstY)) {
-        draw();
+        draw(win);
         auto p = *mp.begin();
         mp.erase(mp.begin());
         x = std::get<2>(p), y = std::get<3>(p);
@@ -277,12 +296,12 @@ bool find_path()   {
     }
     for (int i=temp_path.size()-1; i >= 0; --i)  {
         grid[temp_path[i].first / mx][temp_path[i].first % mx] = 301;
-        draw();
+        draw(win);
     }
     grid[dstX][dstY] = 301;
     for (auto it = temp_path.rbegin(); it != temp_path.rend(); ++it)    {
         path.push_back(*it);
-        draw();
+        draw(win);
     }
     return 1;
 }
