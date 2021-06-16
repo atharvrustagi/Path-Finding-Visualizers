@@ -4,14 +4,24 @@ using namespace sf;
 
 const int dimX = 1000, 
           dimY = 800,
-          gap = 25, mx = 1000,
+          gap = 20, mx = 1000,
           gridSizeY = dimX/gap, gridSizeX = dimY/gap;
 int adjdist = 100, diadist = 141;
-
+float arrowSize = 100;
 int srcX=-1, srcY=-1, dstX=-1, dstY=-1;
-int animCount = 30;
+int animCount = 30, frameDelay = 15;    // miliseconds
 int grid[gridSizeX][gridSizeY];
-
+std::vector<std::pair<int, short>> path;  // final path
+/* the 2nd value of the pair can have 8 values, which are the directions from where it came from
+0 - top left
+1 - top
+2 - top right
+3 - left
+5 - right
+6 - bottom left
+7 - bottom
+8 - right
+*/
 void draw();
 void plot(Vector2i &pos);
 void initialise();
@@ -62,21 +72,126 @@ int main()  {
     return 0;
 }
 
+auto lineColor = Color(100, 200, 148),
+     pathColor = Color(255, 255, 255), 
+     travColor = Color(255, 18, 128),
+     unviColor = travColor, //Color(18, 255, 18),
+     wallColor = Color(128, 128, 128), 
+     srcColor = Color(0, 0, 0), 
+     dstColor = Color(0, 0, 0), 
+     arrowColor = Color(18, 255, 18);
+
+RectangleShape square(Vector2f(gap, gap));
+RectangleShape lineRec(Vector2f(1, 2));
+CircleShape src((float)gap/3, 20);
+RectangleShape dst(Vector2f(2*(float)gap/3, 2*(float)gap/3));
+ConvexShape arrow(6);
+
+void initialise()   {
+    memset(grid, 0, sizeof(grid));
+
+    lineRec.setFillColor(lineColor);
+    square.setOrigin(float(gap)/2, float(gap)/2);
+    src.setOrigin(src.getRadius(), src.getRadius());
+    src.setFillColor(srcColor);
+    dst.setOrigin(dst.getSize().x/2, dst.getSize().y/2);
+    dst.setFillColor(dstColor);
+    // arrow
+    arrow.setPoint(0, Vector2f(0, 0));
+    arrow.setPoint(1, Vector2f(arrowSize, 0));
+    arrow.setPoint(2, Vector2f(2*arrowSize, 2*arrowSize));
+    arrow.setPoint(3, Vector2f(arrowSize, 4*arrowSize));
+    arrow.setPoint(4, Vector2f(0, 4*arrowSize));
+    arrow.setPoint(5, Vector2f(arrowSize, 2*arrowSize));
+    arrow.setFillColor(arrowColor);
+    arrow.setScale(0.65*gap/arrowSize/4, 0.55*gap/arrowSize/4);
+    arrow.setOrigin(arrowSize, 2*arrowSize);
+}
+
+void draw() {
+    win.clear();
+    for (int i=0; i<gridSizeX; ++i) {
+        for (int j=0; j<gridSizeY; ++j) {
+            if (!grid[i][j])
+                continue;
+            
+            if (grid[i][j] % 100 < animCount)
+                ++grid[i][j];
+            float newscale = float(grid[i][j] % 100) / animCount;
+            square.setScale(newscale, newscale);
+            
+            if (grid[i][j] > 400) {   // unvisited node (in set)
+                square.setFillColor(unviColor);
+                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
+                win.draw(square);
+            }
+            else if (grid[i][j] > 300) {   // path node
+                square.setFillColor(pathColor);
+                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
+                win.draw(square);
+            }
+            else if (grid[i][j] > 200)  {  // wall node
+                square.setFillColor(wallColor);
+                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
+                win.draw(square);
+            }
+            else if (grid[i][j] > 100)  {   // opened node
+                square.setFillColor(travColor);
+                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
+                win.draw(square);
+            }
+        }
+    }
+    // source and destination marking
+    if (srcX != -1)
+        win.draw(src);
+    if (dstX != -1)
+        win.draw(dst);
+    
+    // arrows
+    for (auto &p:path)  {
+        arrow.setRotation(p.second);
+        arrow.setPosition((p.first%mx)*gap + (float)gap/2, (p.first/mx)*gap + (float)gap/2);
+        win.draw(arrow);
+    }
+
+    // draw lines
+    lineRec.setPosition(0, 0);
+    lineRec.setSize(Vector2f(dimX, 2));
+    for (int i=0; i<dimY; i+=gap)   {
+        lineRec.move(0, gap);
+        win.draw(lineRec);
+    }
+    lineRec.setSize(Vector2f(2, dimY));
+    lineRec.setPosition(0, 0);
+    for (int j=0; j<dimX; j+=gap)   {
+        lineRec.move(gap, 0);
+        win.draw(lineRec);
+    }
+    Event event;
+    while (win.pollEvent(event))
+            if (event.type == Event::Closed)
+                win.close();
+    win.display();
+    sleep(milliseconds(frameDelay));
+}
+
 void display_grid() {
     // displays the grid state
     std::cout << std::endl;
     for (int i=0; i<gridSizeX; ++i) {
-        for (int j=0; j<gridSizeY; ++j)
-            // if (grid[i][j]==100+animCount)
-            //     std::cout << "* ";
-            if (grid[i][j]==200+animCount)
-                std::cout << "# ";
-            else if (grid[i][j]==300+animCount)
+        for (int j=0; j<gridSizeY; ++j) {
+            if (grid[i][j]>=400)
+                std::cout << "  ";
+            else if (grid[i][j]>=300)
                 std::cout << "@ ";
-            // else if (grid[i][j]==400+animCount)
-            //     std::cout << "' ";
+            else if (grid[i][j]>=200)
+                std::cout << "# ";
+            // else if (grid[i][j]==100+animCount)
+            //     std::cout << "* ";
             else
                 std::cout << "  ";
+        }
         std::cout << std::endl;
     }
 }
@@ -150,13 +265,20 @@ bool find_path()   {
     grid[srcX][srcY] = 301;
     if (!(x==dstX && y==dstY))
         return 0;
+    // rotation map
+    int map[9] = {-135, -90, -45, 180, INT_MAX, 0, 135, 90, 45};
     while (!(x==srcX && y==srcY))   {
-        int p = parent[x][y];
-        grid[x][y] = 301;
+        int p = parent[x][y];   // parent of x, y is p
+        short direction = (x-p/mx+1) * 3 + y-p%mx+1;
+        path.push_back({p, map[direction]});
         x = p / mx;
         y = p % mx;
+    }
+    for (int i=path.size()-1; i >= 0; --i)  {
+        grid[path[i].first / mx][path[i].first % mx] = 301;
         draw();
     }
+    grid[dstX][dstY] = 301;
     return 1;
 }
 
@@ -167,84 +289,17 @@ void plot(Vector2i &pos)    {
         srcY = px;
         srcX = py;
         grid[srcX][srcY] = 301;
+        src.setPosition(srcY * gap + (float)gap/2, srcX * gap + (float)gap/2);
         return;
     }
     if (dstX == -1) {
         dstX = py;
         dstY = px;
         grid[dstX][dstY] = 301;
+        dst.setPosition(dstY * gap + (float)gap/2, dstX * gap + (float)gap/2);
         return;
     }
     if ( (py==srcX && px==srcY) || (py==dstX && px==dstY) )
         return;
     grid[py][px] = 201;
-}
-
-auto lineColor = Color(100, 200, 148),
-     pathColor = Color(255, 255, 255), 
-     travColor = Color(255, 18, 128),
-     unviColor = Color(18, 255, 18),
-     wallColor = Color(128, 128, 128);
-
-RectangleShape square(Vector2f(gap, gap));
-RectangleShape lineRec(Vector2f(1, 2));
-void initialise()   {
-    lineRec.setFillColor(lineColor);
-    square.setOrigin(float(gap)/2, float(gap)/2);
-    memset(grid, 0, sizeof(grid));
-}
-
-void draw() {
-    win.clear();
-    for (int i=0; i<gridSizeX; ++i) {
-        for (int j=0; j<gridSizeY; ++j) {
-            if (!grid[i][j])
-                continue;
-            
-            if (grid[i][j] % 100 < animCount)
-                ++grid[i][j];
-            float newscale = float(grid[i][j] % 100) / animCount;
-            square.setScale(newscale, newscale);
-            
-            if (grid[i][j] > 400) {   // unvisited node (in set)
-                square.setFillColor(unviColor);
-                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
-                win.draw(square);
-            }
-            else if (grid[i][j] > 300) {   // path node
-                square.setFillColor(pathColor);
-                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
-                win.draw(square);
-            }
-            else if (grid[i][j] > 200)  {  // wall node
-                square.setFillColor(wallColor);
-                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
-                win.draw(square);
-            }
-            else if (grid[i][j] > 100)  {   // opened node
-                square.setFillColor(travColor);
-                square.setPosition(gap*j + (float)gap/2, gap*i + (float)gap/2);
-                win.draw(square);
-            }
-        }
-    }
-    // draw lines
-    lineRec.setPosition(0, 0);
-    lineRec.setSize(Vector2f(dimX, 2));
-    for (int i=0; i<dimY; i+=gap)   {
-        lineRec.move(0, gap);
-        win.draw(lineRec);
-    }
-    lineRec.setSize(Vector2f(2, dimY));
-    lineRec.setPosition(0, 0);
-    for (int j=0; j<dimX; j+=gap)   {
-        lineRec.move(gap, 0);
-        win.draw(lineRec);
-    }
-    Event event;
-    while (win.pollEvent(event))
-            if (event.type == Event::Closed)
-                win.close();
-    win.display();
-    sleep(milliseconds(15));
 }
