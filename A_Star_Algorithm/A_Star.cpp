@@ -4,7 +4,7 @@ using namespace sf;
 
 const int dimX = 1000, 
           dimY = 800,
-          gap = 20, mx = 1000,
+          gap = 25, mx = 1000,
           gridSizeY = dimX/gap, gridSizeX = dimY/gap;
 int adjdist = 100, diadist = 141;
 float arrowSize = 100;
@@ -75,7 +75,7 @@ int main()  {
 auto lineColor = Color(100, 200, 148),
      pathColor = Color(255, 255, 255), 
      travColor = Color(255, 18, 128),
-     unviColor = travColor, //Color(18, 255, 18),
+     unviColor = Color(18, 255, 18),
      wallColor = Color(128, 128, 128), 
      srcColor = Color(0, 0, 0), 
      dstColor = Color(0, 0, 0), 
@@ -224,7 +224,7 @@ bool find_path()   {
         for (int j=0; j<gridSizeY; ++j) {
             gcost[i][j] = INT_MAX;
             fcost[i][j] = INT_MAX;
-            hcost[i][j] = hcost[i][j] = (abs(dstX-i) + abs(dstY-j)) * adjdist;    // (std::max(abs(dstX-i), abs(dstY-j)) - std::min(abs(dstX-i), abs(dstY-j))) * adjdist + std::min(abs(dstX-i), abs(dstY-j)) * diadist;    // 
+            hcost[i][j] = (abs(dstX-i) + abs(dstY-j)) * adjdist;    // (std::max(abs(dstX-i), abs(dstY-j)) - std::min(abs(dstX-i), abs(dstY-j))) * adjdist + std::min(abs(dstX-i), abs(dstY-j)) * diadist;    // 
             parent[i][j] = -1;
         }
     }
@@ -246,7 +246,7 @@ bool find_path()   {
             grid[x][y] = 101;
         for (auto &v : vis)    {
             int nbx = v.first+x, nby = v.second+y;
-            if (grid[nbx][nby] && !(nbx==dstX && nby==dstY) || out_of_bounds(nbx, nby) || blocked(v.first, v.second, x, y))
+            if (grid[nbx][nby] && (grid[nbx][nby]<400 || grid[nbx][nby]>500) && !(nbx==dstX && nby==dstY) || out_of_bounds(nbx, nby) || blocked(v.first, v.second, x, y))
                 continue;
             
             grid[nbx][nby] = 401;
@@ -265,20 +265,25 @@ bool find_path()   {
     grid[srcX][srcY] = 301;
     if (!(x==dstX && y==dstY))
         return 0;
-    // rotation map
+    // rotation angle map for arrow
     int map[9] = {-135, -90, -45, 180, INT_MAX, 0, 135, 90, 45};
+    std::vector<std::pair<int, short>> temp_path;
     while (!(x==srcX && y==srcY))   {
         int p = parent[x][y];   // parent of x, y is p
         short direction = (x-p/mx+1) * 3 + y-p%mx+1;
-        path.push_back({p, map[direction]});
+        temp_path.push_back({p, map[direction]});
         x = p / mx;
         y = p % mx;
     }
-    for (int i=path.size()-1; i >= 0; --i)  {
-        grid[path[i].first / mx][path[i].first % mx] = 301;
+    for (int i=temp_path.size()-1; i >= 0; --i)  {
+        grid[temp_path[i].first / mx][temp_path[i].first % mx] = 301;
         draw();
     }
     grid[dstX][dstY] = 301;
+    for (auto it = temp_path.rbegin(); it != temp_path.rend(); ++it)    {
+        path.push_back(*it);
+        draw();
+    }
     return 1;
 }
 
