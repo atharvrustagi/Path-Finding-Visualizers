@@ -4,8 +4,9 @@ using namespace sf;
 
 int dimX = 1000, 
     dimY = 800,
-    gap = 100, mx = 1000,
+    gap = 25, mx = 1000,
     gridSizeY = dimX/gap, gridSizeX = dimY/gap;
+bool DIAGONAL = 0;
 int adjdist = 100, diadist = 141;
 float arrowSize = 100;
 int srcX=-1, srcY=-1, dstX=-1, dstY=-1;
@@ -32,6 +33,7 @@ int dist(int a, int b);
 bool out_of_bounds(int x, int y);
 
 int main()  {
+    main_loop:
     if (take_input())   {
         dimY = gridSizeX * gap, dimX = gridSizeY * gap;
     }
@@ -43,6 +45,8 @@ int main()  {
         while (win.pollEvent(event))    {
             if (event.type == Event::Closed)
                 win.close();
+            else if (calc && event.type == Event::KeyPressed)
+                goto main_loop;
             else if (done);
             else if (dstX != -1 && event.type == Event::KeyPressed) {
                 if (Keyboard::isKeyPressed(Keyboard::Enter))
@@ -70,6 +74,7 @@ int main()  {
             else
                 std::cout << "Path not found.\n";
             calc = 1;
+            printf("Press any key to start again\n");
         }
     }
 
@@ -93,7 +98,7 @@ ConvexShape arrow(6);
 
 bool take_input()   {
     char c;
-    printf("Do you want the window to open with default dimensions? (y/n): ");
+    printf("Do you want the window to open with default dimensions and values? (y/n): ");
     std::cin >> c;
     if (c=='y')
         return 0;
@@ -101,10 +106,15 @@ bool take_input()   {
     std::cin >> gridSizeY >> gridSizeX;
     printf("Size of Each Square (in pixels): ");
     std::cin >> gap;
+    printf("Travel to cells diagonally? (y/n): ");
+    std::cin >> c;
+    DIAGONAL = (c=='y');
     return 1;
 }
 
 void initialise()   {
+    path.clear();
+    srcX = srcY = dstX = dstY = -1;
     memset(grid, 0, sizeof(grid));
     lineRec.setFillColor(lineColor);
     square.setSize(Vector2f((float)gap, (float)gap));
@@ -228,7 +238,7 @@ bool out_of_bounds(int x, int y)    {
 bool blocked(int nx, int ny, int x, int y)  {
     if (abs(nx) != abs(ny))
         return 0;
-    return grid[x][y+ny] && grid[x+nx][y];
+    return (grid[x][y+ny] > 200 && grid[x][y+ny] < 300) && (grid[x+nx][y] > 200 && grid[x+nx][y] < 300);
 }
 
 bool find_path(RenderWindow &win)   {
@@ -243,8 +253,8 @@ bool find_path(RenderWindow &win)   {
         for (int j=0; j<gridSizeY; ++j) {
             gcost[i][j] = INT_MAX;
             fcost[i][j] = INT_MAX;
-            hcost[i][j] = (abs(dstX-i) + abs(dstY-j)) * adjdist;    // (std::max(abs(dstX-i), abs(dstY-j)) - std::min(abs(dstX-i), abs(dstY-j))) * adjdist + std::min(abs(dstX-i), abs(dstY-j)) * diadist;    // 
             parent[i][j] = -1;
+            hcost[i][j] = DIAGONAL ? (std::max(abs(dstX-i), abs(dstY-j)) - std::min(abs(dstX-i), abs(dstY-j))) * adjdist + std::min(abs(dstX-i), abs(dstY-j)) * diadist : (abs(dstX-i) + abs(dstY-j)) * adjdist;
         }
     }
 
@@ -253,8 +263,11 @@ bool find_path(RenderWindow &win)   {
     std::set<std::tuple<int, int, int, int>> mp;
     mp.insert({fcost[srcX][srcY], hcost[srcX][srcY], srcX, srcY});
 
-    std::vector<std::pair<int, int>> vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}};     // for adjacent neighbors only
-    // std::vector<std::pair<int, int>> vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, -1}, {1, -1}, {1, 1}, {-1, 1}};    // for adjacent and diagonal neighbors
+    std::vector<std::pair<int, int>> vis;
+    if (!DIAGONAL)
+        vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}};     // for adjacent neighbors only
+    else
+        vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, -1}, {1, -1}, {1, 1}, {-1, 1}};    // for adjacent and diagonal neighbors
     
     while (!mp.empty() && !(x == dstX && y == dstY)) {
         draw(win);
@@ -265,7 +278,7 @@ bool find_path(RenderWindow &win)   {
             grid[x][y] = 101;
         for (auto &v : vis)    {
             int nbx = v.first+x, nby = v.second+y;
-            if (grid[nbx][nby] && (grid[nbx][nby]<400 || grid[nbx][nby]>500) && !(nbx==dstX && nby==dstY) || out_of_bounds(nbx, nby) || blocked(v.first, v.second, x, y))
+            if (out_of_bounds(nbx, nby) || grid[nbx][nby] && (grid[nbx][nby]<400 || grid[nbx][nby]>500) && !(nbx==dstX && nby==dstY) || blocked(v.first, v.second, x, y))
                 continue;
             
             grid[nbx][nby] = 401;
