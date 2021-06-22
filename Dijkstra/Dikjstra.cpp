@@ -27,7 +27,7 @@ std::vector<std::pair<int, short>> path;  // final path
 void draw(RenderWindow &win);
 void plot(Vector2i &pos);
 void initialise();
-bool dijkstra(RenderWindow &win);
+int dijkstra(RenderWindow &win);
 void display_grid();
 bool take_input();
 int dist(int a, int b);
@@ -68,9 +68,11 @@ int main()  {
         }
         draw(win);
         if (done && !calc)  {
-            if (dijkstra(win))    {
+            int g_cost = dijkstra(win);
+            if (g_cost != -1)    {
                 std::cout << "Path found!\n";
                 display_grid();
+                printf("Cost of path: %d\n", g_cost);
             }
             else
                 std::cout << "Path not found.\n";
@@ -78,7 +80,6 @@ int main()  {
             printf("Press any key to start again\n");
         }
     }
-
     return 0;
 }
 
@@ -101,7 +102,7 @@ bool take_input()   {
     char c;
     printf("Do you want the window to open with default dimensions and values? (y/n): ");
     std::cin >> c;
-    if (c=='y')
+    if (c!='n')
         return 0;
     printf("Grid Dimensions: (X <space> Y): ");
     std::cin >> gridSizeY >> gridSizeX;
@@ -242,9 +243,29 @@ bool blocked(int nx, int ny, int x, int y)  {
     return (grid[x][y+ny] > 200 && grid[x][y+ny] < 300) && (grid[x+nx][y] > 200 && grid[x+nx][y] < 300);
 }
 
-bool dijkstra(RenderWindow &win)   {
-    // only g costs are there
+void plot(Vector2i &pos)    {
+    int px = std::min(dimX, pos.x)/gap, py = std::min(dimY, pos.y)/gap;
+    px = std::max(0, pos.x)/gap, py = std::max(0, pos.y)/gap;
+    if (srcX == -1) {
+        srcY = px;
+        srcX = py;
+        grid[srcX][srcY] = 301;
+        src.setPosition(srcY * gap + (float)gap/2, srcX * gap + (float)gap/2);
+        return;
+    }
+    if (dstX == -1) {
+        dstX = py;
+        dstY = px;
+        grid[dstX][dstY] = 301;
+        dst.setPosition(dstY * gap + (float)gap/2, dstX * gap + (float)gap/2);
+        return;
+    }
+    if ( (py==srcX && px==srcY) || (py==dstX && px==dstY) )
+        return;
+    grid[py][px] = 201;
+}
 
+int dijkstra(RenderWindow &win)   {
     int parent[gridSizeX][gridSizeY],
         gcost [gridSizeX][gridSizeY];
     int x, y;
@@ -291,7 +312,7 @@ bool dijkstra(RenderWindow &win)   {
     }
     grid[srcX][srcY] = 301;
     if (!(x==dstX && y==dstY))
-        return 0;
+        return -1;
     int map[9] = {-135, -90, -45, 180, INT_MAX, 0, 135, 90, 45};
     std::vector<std::pair<int, short>> temp_path;
     while (!(x==srcX && y==srcY))   {
@@ -311,28 +332,7 @@ bool dijkstra(RenderWindow &win)   {
         path.push_back(*it);
         draw(win);
     }
-    return 1;
-}
-
-
-void plot(Vector2i &pos)    {
-    int px = std::min(dimX, pos.x)/gap, py = std::min(dimY, pos.y)/gap;
-    px = std::max(0, pos.x)/gap, py = std::max(0, pos.y)/gap;
-    if (srcX == -1) {
-        srcY = px;
-        srcX = py;
-        grid[srcX][srcY] = 301;
-        src.setPosition(srcY * gap + (float)gap/2, srcX * gap + (float)gap/2);
-        return;
-    }
-    if (dstX == -1) {
-        dstX = py;
-        dstY = px;
-        grid[dstX][dstY] = 301;
-        dst.setPosition(dstY * gap + (float)gap/2, dstX * gap + (float)gap/2);
-        return;
-    }
-    if ( (py==srcX && px==srcY) || (py==dstX && px==dstY) )
-        return;
-    grid[py][px] = 201;
+    int p = parent[dstX][dstY];
+    int g_cost = gcost[p/mx][p%mx] + dist(dstX-p/mx, dstY-p%mx);
+    return g_cost;
 }
