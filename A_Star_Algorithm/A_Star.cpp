@@ -4,7 +4,7 @@ using namespace sf;
 
 int dimX = 1000, 
     dimY = 800,
-    gap = 25, mx = 1000,
+    gap = 50, mx = 1000,
     gridSizeY = dimX/gap, gridSizeX = dimY/gap;
 bool DIAGONAL = 0;
 int adjdist = 100, diadist = 141;
@@ -23,10 +23,11 @@ std::vector<std::pair<int, short>> path;  // final path
 7 - bottom
 8 - right
 */
+
 void draw(RenderWindow &win);
 void plot(Vector2i &pos);
 void initialise();
-bool find_path(RenderWindow &win);
+int a_star(RenderWindow &win);
 void display_grid();
 bool take_input();
 int dist(int a, int b);
@@ -67,9 +68,11 @@ int main()  {
         }
         draw(win);
         if (done && !calc)  {
-            if (find_path(win))    {
+            int cost = a_star(win);
+            if (cost != -1)    {
                 std::cout << "Path found!\n";
                 display_grid();
+                printf("Cost of path: %d\n", cost);
             }
             else
                 std::cout << "Path not found.\n";
@@ -81,10 +84,10 @@ int main()  {
     return 0;
 }
 
-auto lineColor = Color(100, 200, 148),
+auto lineColor = Color(10, 20, 14),
      pathColor = Color(255, 255, 255), 
      travColor = Color(255, 18, 128),
-     unviColor = Color(18, 255, 18),
+     unviColor = Color(18, 18, 200),
      wallColor = Color(128, 128, 128), 
      srcColor = Color(0, 0, 0), 
      dstColor = Color(0, 0, 0), 
@@ -241,19 +244,18 @@ bool blocked(int nx, int ny, int x, int y)  {
     return (grid[x][y+ny] > 200 && grid[x][y+ny] < 300) && (grid[x+nx][y] > 200 && grid[x+nx][y] < 300);
 }
 
-bool find_path(RenderWindow &win)   {
+int a_star(RenderWindow &win)   {
     int gcost[gridSizeX][gridSizeY],
         hcost[gridSizeX][gridSizeY],
         fcost[gridSizeX][gridSizeY],
         parent[gridSizeX][gridSizeY];
 
     int x, y;
-
+    memset(parent, -1, sizeof(parent));
     for (int i=0; i<gridSizeX; ++i) {
         for (int j=0; j<gridSizeY; ++j) {
             gcost[i][j] = INT_MAX;
             fcost[i][j] = INT_MAX;
-            parent[i][j] = -1;
             hcost[i][j] = DIAGONAL ? (std::max(abs(dstX-i), abs(dstY-j)) - std::min(abs(dstX-i), abs(dstY-j))) * adjdist + std::min(abs(dstX-i), abs(dstY-j)) * diadist : (abs(dstX-i) + abs(dstY-j)) * adjdist;
         }
     }
@@ -270,7 +272,6 @@ bool find_path(RenderWindow &win)   {
         vis = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, -1}, {1, -1}, {1, 1}, {-1, 1}};    // for adjacent and diagonal neighbors
     
     while (!mp.empty() && !(x == dstX && y == dstY)) {
-        draw(win);
         auto p = *mp.begin();
         mp.erase(mp.begin());
         x = std::get<2>(p), y = std::get<3>(p);
@@ -280,6 +281,8 @@ bool find_path(RenderWindow &win)   {
             int nbx = v.first+x, nby = v.second+y;
             if (out_of_bounds(nbx, nby) || grid[nbx][nby] && (grid[nbx][nby]<400 || grid[nbx][nby]>500) && !(nbx==dstX && nby==dstY) || blocked(v.first, v.second, x, y))
                 continue;
+            
+            draw(win);
             
             grid[nbx][nby] = 401;
             auto it = mp.find({fcost[nbx][nby], hcost[nbx][nby], nbx, nby});
@@ -296,7 +299,7 @@ bool find_path(RenderWindow &win)   {
     }
     grid[srcX][srcY] = 301;
     if (!(x==dstX && y==dstY))
-        return 0;
+        return -1;
     // rotation angle map for arrow
     int map[9] = {-135, -90, -45, 180, INT_MAX, 0, 135, 90, 45};
     std::vector<std::pair<int, short>> temp_path;
@@ -316,7 +319,9 @@ bool find_path(RenderWindow &win)   {
         path.push_back(*it);
         draw(win);
     }
-    return 1;
+    int p = parent[dstX][dstY];
+    int g_cost = gcost[p/mx][p%mx] + dist(dstX-p/mx, dstY-p%mx);
+    return g_cost;
 }
 
 void plot(Vector2i &pos)    {
